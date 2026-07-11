@@ -1,0 +1,40 @@
+# DEM tool registry — declarative descriptors for the family of tools
+# published as a single binary (or archive) on GitHub Releases.
+#
+# dem embeds this file at build time and periodically refreshes it
+# from the repository, caching the fetched copy; a fetched registry is
+# only adopted when its schema is supported by the running dem build.
+#
+# Fields per tool:
+#   repo         GitHub owner/name whose releases are consumed
+#   executables  binaries that get a shim (a raw-binary asset is
+#                installed under each of these names)
+#   assets       asset name per <os>-<arch>; {version} is replaced
+#                with the version (tag without the leading "v");
+#                .zip/.tar.gz assets are extracted, anything else is
+#                treated as the binary itself
+#   checksums    optional sha256sum-format asset to verify downloads
+
+schema: 1
+
+tools:
+  kit:
+    repo: ki-kneip/kit
+    executables: [kit]
+    assets:
+      windows-amd64: kit_v{version}_windows_amd64.zip
+      linux-amd64: kit_v{version}_linux_amd64.tar.gz
+      linux-arm64: kit_v{version}_linux_arm64.tar.gz
+      darwin-amd64: kit_v{version}_darwin_amd64.tar.gz
+      darwin-arm64: kit_v{version}_darwin_arm64.tar.gz
+
+  pnpm:
+    repo: pnpm/pnpm
+    executables: [pnpm, pnpx]
+    assets:
+      windows-amd64: pnpm-win-x64.exe
+      windows-arm64: pnpm-win-arm64.exe
+      linux-amd64: pnpm-linux-x64
+      linux-arm64: pnpm-linux-arm64
+      darwin-amd64: pnpm-macos-x64
+      darwin-arm64: pnpm-macos-arm64

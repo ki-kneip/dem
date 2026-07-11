@@ -1,0 +1,54 @@
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+  # fallback for tags that do not fire the push event (e.g. created
+  # through the GitHub UI in some flows): run manually against a tag
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+
+      # Cross-compile every platform. The shim payload must be
+      # regenerated per target so each dem binary embeds the dem-shim
+      # of its own platform (asset naming matches what self-update
+      # expects: dem-<os>-<arch>[.exe] + checksums.txt).
+      - name: Build all platforms
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          VERSION="${GITHUB_REF_NAME}"
+          for target in linux/amd64 linux/arm64 darwin/amd64 darwin/arm64 windows/amd64 windows/arm64; do
+            export GOOS="${target%/*}" GOARCH="${target#*/}"
+            ext=""
+            if [ "$GOOS" = "windows" ]; then
+              ext=".exe"
+            fi
+            go generate ./...
+            go build -trimpath \
+              -ldflags "-s -w -X github.com/ki-kneip/dem/internal/cli.Version=${VERSION}" \
+              -o "dist/dem-${GOOS}-${GOARCH}${ext}" ./cmd/dem
+          done
+
+      - name: Checksums
+        run: cd dist && sha256sum dem-* > checksums.txt
+
+      # gh ships with the runner; no third-party action needed
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" dist/* \
+            --verify-tag \
+            --generate-notes
