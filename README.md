@@ -1,8 +1,8 @@
 # dem
 
 **Development Environment Manager** — a single binary that installs and manages
-versions of your runtimes, SDKs and CLIs (Go, Node.js, pnpm — more to come),
-per project or globally, on Windows, Linux and macOS.
+versions of your runtimes, SDKs and CLIs (Go, Node.js, Java, pnpm — more to
+come), per project or globally, on Windows, Linux and macOS.
 
 ```console
 $ dem install node@lts
@@ -13,6 +13,23 @@ $ dem use node@24 --global
 
 $ node --version
 v24.18.0
+```
+
+Java works the same way, with an optional vendor prefix (defaults to
+Temurin):
+
+```console
+$ dem install java@21
+✓ java@temurin-21.0.4+7 installed
+
+$ dem install java@corretto-21
+✓ java@corretto-21.0.4.7.1 installed
+
+$ dem use java@corretto-21 --global
+✓ java@corretto-21.0.4.7.1 set as the global default
+
+$ java -version
+openjdk version "21.0.4" ...
 ```
 
 ## Why
@@ -61,6 +78,7 @@ Drop a `dem.yaml` at your project root (or let `dem use` write it for you):
 tools:
   node: 22.5.1
   go: 1.22.5
+  java: corretto-21.0.4.7.1
 ```
 
 Any tool run from inside the project — any subdirectory — uses these
@@ -91,7 +109,7 @@ an update when its schema is supported by the running build — newer
 registry formats never break older installations. Adding a tool to
 the registry is a small YAML pull request, no Go required.
 
-Planned: Python.
+Planned: Python, Gradle, Maven.
 
 ## How it works
 
