@@ -54,7 +54,17 @@ var setupCmd = &cobra.Command{
 		fmt.Fprintln(out, ui.Success("layout created at "+ui.Badge(paths.Root)))
 		fmt.Fprintln(out, ui.Success("binary installed: "+ui.Badge("dem")))
 		fmt.Fprintln(out)
-		printActivation(out, paths)
+
+		switch configured, perr := persistPath(paths); {
+		case perr != nil:
+			fmt.Fprintln(out, ui.Dim("could not update PATH automatically ("+perr.Error()+"); add it manually:"))
+			printActivation(out, paths)
+		case configured:
+			fmt.Fprintln(out, ui.Success("PATH configured"))
+			fmt.Fprintln(out, ui.Dim("open a new terminal and run: dem current"))
+		default:
+			printActivation(out, paths)
+		}
 		return nil
 	},
 }
