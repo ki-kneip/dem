@@ -97,6 +97,9 @@ func (*Provider) checksumFor(ctx context.Context, baseURL, asset string) (string
 			return fields[0], nil
 		}
 	}
+	if err := sc.Err(); err != nil {
+		return "", fmt.Errorf("reading SHASUMS256.txt: %w", err)
+	}
 	return "", fmt.Errorf("SHASUMS256.txt has no entry for %s", asset)
 }
 

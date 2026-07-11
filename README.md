@@ -75,6 +75,7 @@ Built-in runtime providers:
 |---|---|---|
 | `go` | go.dev/dl | `go`, `gofmt` |
 | `node` | nodejs.org/dist | `node`, `npm`, `npx`, `corepack`; `lts` spec supported |
+| `java` | [foojay Disco API](https://api.foojay.io) | `java`, `javac`, `jar`... multi-distribution — Temurin (default), Corretto, Zulu, GraalVM, Liberica...; select a vendor with `java@<vendor>-<version>`, e.g. `java@corretto-21` |
 
 Registry tools — CLIs shipped as a single binary or archive on GitHub
 Releases, described declaratively in [registry.yaml](registry.yaml):
@@ -90,8 +91,7 @@ an update when its schema is supported by the running build — newer
 registry formats never break older installations. Adding a tool to
 the registry is a small YAML pull request, no Go required.
 
-Planned: Java (multi-distribution via the [foojay Disco API](https://api.foojay.io) —
-Temurin, Corretto, Zulu, GraalVM...), Python.
+Planned: Python.
 
 ## How it works
 
