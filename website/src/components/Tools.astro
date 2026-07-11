@@ -1,0 +1,124 @@
+---
+const tools = [
+  { name: "Go", detail: "go, gofmt — from go.dev/dl", status: "ready" },
+  { name: "Node.js", detail: "node, npm, npx, corepack — lts spec supported", status: "ready" },
+  { name: "pnpm", detail: "standalone build, independent of the Node version", status: "ready" },
+  { name: "kit", link: "https://github.com/ki-kneip/kit", detail: "single-binary CLI, installed straight from GitHub Releases via the registry", status: "ready" },
+  { name: "Java", detail: "multi-distribution via the foojay Disco API — Temurin, Corretto, Zulu, GraalVM…", status: "planned" },
+  { name: "Python", detail: "on the roadmap", status: "planned" },
+];
+---
+
+<section id="tools">
+  <div class="container">
+    <p class="section-label reveal">Supported tools</p>
+    <h2 class="section-title reveal" style="--reveal-delay: 60ms">
+      Growing, one provider at a time
+    </h2>
+    <p class="section-desc reveal" style="--reveal-delay: 120ms">
+      Each tool is a provider: a small module that knows where releases live
+      and how to verify them. More are on the way.
+    </p>
+
+    <div class="tools-grid">
+      {
+        tools.map((t, i) => (
+          <div
+            class:list={["tool-card", "reveal", { planned: t.status === "planned" }]}
+            style={`--reveal-delay: ${i * 70}ms`}
+          >
+            <div class="tool-head">
+              {
+                t.link ? (
+                  <a class="tool-name tool-link" href={t.link} target="_blank" rel="noopener">
+                    {t.name}
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                      <path d="M7 17 17 7M8 7h9v9" />
+                    </svg>
+                  </a>
+                ) : (
+                  <span class="tool-name">{t.name}</span>
+                )
+              }
+              <span class:list={["badge", t.status]}>
+                {t.status === "ready" ? "available" : "planned"}
+              </span>
+            </div>
+            <p>{t.detail}</p>
+          </div>
+        ))
+      }
+    </div>
+  </div>
+</section>
+
+<style>
+  .tools-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 16px;
+  }
+  .tool-card {
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 20px 22px;
+    background: linear-gradient(180deg, var(--surface), var(--bg-elevated));
+    transition: border-color 0.25s ease, transform 0.25s ease;
+  }
+  .tool-card:hover {
+    border-color: var(--border-strong);
+    transform: translateY(-3px);
+  }
+  .tool-card.planned {
+    opacity: 0.55;
+    background: transparent;
+    border-style: dashed;
+  }
+  .tool-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 8px;
+  }
+  .tool-name {
+    font-weight: 600;
+    font-size: 1.02rem;
+  }
+  .tool-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    transition: color 0.2s ease;
+  }
+  .tool-link svg {
+    color: var(--text-faint);
+    transition: color 0.2s ease, transform 0.2s ease;
+  }
+  .tool-link:hover {
+    color: var(--accent);
+  }
+  .tool-link:hover svg {
+    color: var(--accent);
+    transform: translate(1px, -1px);
+  }
+  .badge {
+    font-family: var(--font-mono);
+    font-size: 0.68rem;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    padding: 3px 9px;
+    border-radius: 999px;
+  }
+  .badge.ready {
+    color: var(--accent);
+    background: var(--accent-dim);
+  }
+  .badge.planned {
+    color: var(--text-faint);
+    border: 1px solid var(--border);
+  }
+  .tool-card p {
+    font-size: 0.88rem;
+    color: var(--text-muted);
+  }
+</style>

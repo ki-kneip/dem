@@ -1,0 +1,189 @@
+---
+const steps = [
+  { code: "node --version", label: "you run a tool" },
+  { code: "dem-shim", label: "the shim on your PATH wakes up" },
+  { code: "dem.yaml → config.yaml", label: "nearest project file wins, else global" },
+  { code: "tools/node/22.5.1", label: "execs the real binary, stdio intact" },
+];
+---
+
+<section id="how">
+  <div class="container">
+    <p class="section-label reveal">How it works</p>
+    <h2 class="section-title reveal" style="--reveal-delay: 60ms">
+      Hardlinks and one tiny dispatcher
+    </h2>
+    <p class="section-desc reveal" style="--reveal-delay: 120ms">
+      The names on your PATH — <code class="mono-hl">node</code>,
+      <code class="mono-hl">npm</code>, <code class="mono-hl">go</code>… — are
+      hardlinks to <strong>dem-shim</strong>, a ~2.5&nbsp;MB dispatcher embedded
+      in the main binary. No shell hooks, no <code class="mono-hl">eval</code>
+      in your profile.
+    </p>
+
+    <div class="flow reveal" style="--reveal-delay: 160ms" aria-label="Resolution flow">
+      {
+        steps.map((s, i) => (
+          <>
+            <div class="flow-step" style={`--i: ${i}`}>
+              <code>{s.code}</code>
+              <span>{s.label}</span>
+            </div>
+            {i < steps.length - 1 && (
+              <div class="flow-arrow" aria-hidden="true">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M5 12h14M13 6l6 6-6 6" />
+                </svg>
+              </div>
+            )}
+          </>
+        ))
+      }
+    </div>
+
+    <div class="how-grid">
+      <div class="card reveal" style="--reveal-delay: 100ms">
+        <h3>Per-project pinning</h3>
+        <p>
+          Drop a <code class="mono-hl">dem.yaml</code> at your project root —
+          or let <code class="mono-hl">dem use</code> write it. Every tool run
+          from any subdirectory uses these versions; outside, the global
+          defaults apply.
+        </p>
+        <pre class="code-block"><code><span class="c"># dem.yaml</span>
+<span class="k">tools</span>:
+  <span class="k">node</span>: <span class="v">22.5.1</span>
+  <span class="k">go</span>: <span class="v">1.22.5</span></code></pre>
+      </div>
+
+      <div class="card reveal" style="--reveal-delay: 190ms">
+        <h3>Isolated, verified installs</h3>
+        <p>
+          Each version lives in its own directory — installing one never
+          touches another, and switching moves no files. Downloads are
+          sha256-verified against each source's official manifest.
+        </p>
+        <pre class="code-block"><code><span class="c">~/.dem/</span>
+├── bin/dem              <span class="c"># the CLI</span>
+├── shims/               <span class="c"># dem-shim + hardlinks</span>
+├── tools/&lt;tool&gt;/&lt;ver&gt;/  <span class="c"># isolated installs</span>
+├── cache/               <span class="c"># verified downloads</span>
+└── config.yaml          <span class="c"># global defaults</span></code></pre>
+      </div>
+    </div>
+  </div>
+</section>
+
+<style>
+  .mono-hl {
+    font-size: 0.9em;
+    color: var(--accent-2);
+  }
+
+  .flow {
+    display: flex;
+    align-items: stretch;
+    gap: 10px;
+    flex-wrap: wrap;
+    margin-bottom: 24px;
+    padding: 24px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    background: linear-gradient(180deg, var(--surface), transparent);
+  }
+  .flow-step {
+    flex: 1 1 160px;
+    min-width: 150px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding: 14px 16px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    background: var(--bg-elevated);
+    transition: border-color 0.25s ease, transform 0.25s ease;
+  }
+  .flow-step:hover {
+    border-color: var(--accent);
+    transform: translateY(-3px);
+  }
+  .flow-step code {
+    font-size: 0.82rem;
+    color: var(--accent);
+    font-weight: 500;
+    white-space: nowrap;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+  .flow-step span {
+    font-size: 0.78rem;
+    color: var(--text-faint);
+    line-height: 1.4;
+  }
+  .flow-arrow {
+    display: flex;
+    align-items: center;
+    color: var(--text-faint);
+    animation: nudge 2.4s ease-in-out infinite;
+  }
+  @keyframes nudge {
+    0%,
+    100% {
+      transform: translateX(0);
+      color: var(--text-faint);
+    }
+    50% {
+      transform: translateX(4px);
+      color: var(--accent);
+    }
+  }
+  @media (max-width: 860px) {
+    .flow {
+      flex-direction: column;
+    }
+    .flow-arrow {
+      justify-content: center;
+      transform: rotate(90deg);
+      animation: none;
+    }
+  }
+
+  .how-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+  }
+  @media (max-width: 820px) {
+    .how-grid {
+      grid-template-columns: 1fr;
+    }
+  }
+  .card h3 {
+    font-size: 1.05rem;
+    font-weight: 600;
+    margin-bottom: 10px;
+  }
+  .card > p {
+    color: var(--text-muted);
+    font-size: 0.93rem;
+    margin-bottom: 18px;
+  }
+  .code-block {
+    background: #0a0f18;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 16px 18px;
+    font-size: 0.82rem;
+    line-height: 1.75;
+    overflow-x: auto;
+  }
+  .code-block .c {
+    color: var(--text-faint);
+  }
+  .code-block .k {
+    color: var(--accent-2);
+  }
+  .code-block .v {
+    color: var(--accent);
+  }
+</style>

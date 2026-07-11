@@ -36,3 +36,8 @@ dist/
 
 # generated embed payload (rebuilt by 'go generate ./...')
 internal/shimbin/payload/*.bin
+
+# website
+website/node_modules/
+website/dist/
+website/.astro/

@@ -1,0 +1,92 @@
+---
+const repo = "https://github.com/ki-kneip/dem";
+---
+
+<footer>
+  <div class="container footer-cta reveal">
+    <h2>Ready to <span class="grad">dem</span>?</h2>
+    <p>One binary. Every runtime. All your machines.</p>
+    <div class="footer-actions">
+      <a class="btn btn-primary" href={`${repo}/releases/latest`} target="_blank" rel="noopener">Download the latest release</a>
+      <a class="btn btn-ghost" href={repo} target="_blank" rel="noopener">Star on GitHub</a>
+    </div>
+  </div>
+
+  <div class="container footer-bar">
+    <span class="footer-brand"><span class="p">$</span> dem</span>
+    <span class="footer-meta">
+      <a href={`${repo}/blob/main/LICENSE`} target="_blank" rel="noopener">MIT License</a>
+      <i></i>
+      <a href={repo} target="_blank" rel="noopener">ki-kneip/dem</a>
+    </span>
+  </div>
+</footer>
+
+<style>
+  footer {
+    border-top: 1px solid var(--border);
+    background:
+      radial-gradient(600px 220px at 50% 100%, rgba(61, 220, 132, 0.09), transparent 70%),
+      var(--bg-elevated);
+  }
+  .footer-cta {
+    text-align: center;
+    padding: 88px 24px 64px;
+  }
+  .footer-cta h2 {
+    font-size: clamp(1.8rem, 4.5vw, 2.6rem);
+    font-weight: 800;
+    letter-spacing: -0.02em;
+    margin-bottom: 10px;
+  }
+  .grad {
+    font-family: var(--font-mono);
+    background: var(--gradient);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+  .footer-cta p {
+    color: var(--text-muted);
+    margin-bottom: 30px;
+  }
+  .footer-actions {
+    display: flex;
+    justify-content: center;
+    gap: 14px;
+    flex-wrap: wrap;
+  }
+
+  .footer-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding-top: 22px;
+    padding-bottom: 26px;
+    border-top: 1px solid var(--border);
+    font-size: 0.85rem;
+    color: var(--text-faint);
+  }
+  .footer-brand {
+    font-family: var(--font-mono);
+    font-weight: 600;
+    color: var(--text-muted);
+  }
+  .footer-brand .p {
+    color: var(--accent);
+  }
+  .footer-meta {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  .footer-meta i {
+    width: 3px;
+    height: 3px;
+    border-radius: 50%;
+    background: var(--text-faint);
+  }
+  .footer-meta a:hover {
+    color: var(--text);
+  }
+</style>

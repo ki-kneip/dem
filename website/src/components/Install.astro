@@ -1,0 +1,275 @@
+---
+const dl = "https://github.com/ki-kneip/dem/releases/latest/download";
+
+const tabs = [
+  {
+    id: "windows",
+    label: "Windows",
+    lines: [
+      { prompt: "PS>", cmd: `iwr ${dl}/dem-windows-amd64.exe -OutFile dem.exe` },
+      { prompt: "PS>", cmd: ".\\dem.exe setup" },
+    ],
+  },
+  {
+    id: "linux",
+    label: "Linux",
+    lines: [
+      { prompt: "$", cmd: `curl -fsSLO ${dl}/dem-linux-amd64` },
+      { prompt: "$", cmd: "chmod +x dem-linux-amd64 && ./dem-linux-amd64 setup" },
+    ],
+  },
+  {
+    id: "macos",
+    label: "macOS",
+    lines: [
+      { prompt: "$", cmd: `curl -fsSLO ${dl}/dem-darwin-arm64` },
+      { prompt: "$", cmd: "chmod +x dem-darwin-arm64 && ./dem-darwin-arm64 setup" },
+    ],
+  },
+];
+---
+
+<section id="install">
+  <div class="container">
+    <p class="section-label reveal">Install</p>
+    <h2 class="section-title reveal" style="--reveal-delay: 60ms">
+      Up and running in two commands
+    </h2>
+    <p class="section-desc reveal" style="--reveal-delay: 120ms">
+      Grab the binary and run <code class="inline-code">setup</code> — it
+      creates the layout, installs itself and prints the exact PATH change for
+      your shell. <code class="inline-code">dem doctor</code> verifies
+      everything at any time.
+    </p>
+
+    <div class="install-box reveal" style="--reveal-delay: 180ms">
+      <div class="tab-bar" role="tablist" aria-label="Platform">
+        {
+          tabs.map((tab, i) => (
+            <button
+              class:list={["tab", { active: i === 0 }]}
+              role="tab"
+              aria-selected={i === 0 ? "true" : "false"}
+              data-tab={tab.id}
+            >
+              {tab.label}
+            </button>
+          ))
+        }
+        <div class="tab-indicator" aria-hidden="true"></div>
+      </div>
+
+      {
+        tabs.map((tab, i) => (
+          <div
+            class:list={["tab-panel", { active: i === 0 }]}
+            role="tabpanel"
+            data-panel={tab.id}
+          >
+            {tab.lines.map((line) => (
+              <div class="cmd-line">
+                <code>
+                  <span class="cmd-prompt">{line.prompt}</span> {line.cmd}
+                </code>
+                <button class="copy-btn" data-copy={line.cmd} aria-label="Copy command">
+                  <svg class="ico-copy" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <rect x="9" y="9" width="13" height="13" rx="2" />
+                    <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+                  </svg>
+                  <svg class="ico-check" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <polyline points="20 6 9 17 4 12" />
+                  </svg>
+                </button>
+              </div>
+            ))}
+          </div>
+        ))
+      }
+    </div>
+
+    <p class="install-note reveal" style="--reveal-delay: 240ms">
+      Other architectures (arm64 on Windows/Linux, amd64 on macOS) are on the
+      <a href="https://github.com/ki-kneip/dem/releases/latest" target="_blank" rel="noopener">releases page</a>.
+      Every command supports <code class="inline-code">--plain</code> for scripts and CI.
+    </p>
+  </div>
+</section>
+
+<script>
+  // Preselect the visitor's platform
+  const ua = navigator.userAgent;
+  const os = /Windows/i.test(ua) ? "windows" : /Mac/i.test(ua) ? "macos" : "linux";
+
+  const tabsEl = Array.from(document.querySelectorAll<HTMLButtonElement>(".tab"));
+  const panels = Array.from(document.querySelectorAll<HTMLElement>(".tab-panel"));
+  const indicator = document.querySelector<HTMLElement>(".tab-indicator")!;
+
+  function select(id: string) {
+    for (const t of tabsEl) {
+      const on = t.dataset.tab === id;
+      t.classList.toggle("active", on);
+      t.setAttribute("aria-selected", String(on));
+      if (on) {
+        indicator.style.width = `${t.offsetWidth}px`;
+        indicator.style.transform = `translateX(${t.offsetLeft}px)`;
+      }
+    }
+    for (const p of panels) p.classList.toggle("active", p.dataset.panel === id);
+  }
+
+  tabsEl.forEach((t) => t.addEventListener("click", () => select(t.dataset.tab!)));
+  select(os);
+  // Re-measure once fonts load so the indicator lines up
+  document.fonts?.ready.then(() => {
+    const active = tabsEl.find((t) => t.classList.contains("active"));
+    if (active) select(active.dataset.tab!);
+  });
+
+  // Copy buttons
+  document.querySelectorAll<HTMLButtonElement>(".copy-btn").forEach((btn) => {
+    btn.addEventListener("click", async () => {
+      try {
+        await navigator.clipboard.writeText(btn.dataset.copy!);
+        btn.classList.add("copied");
+        setTimeout(() => btn.classList.remove("copied"), 1600);
+      } catch {}
+    });
+  });
+</script>
+
+<style>
+  .inline-code {
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 2px 7px;
+    font-size: 0.86em;
+    color: var(--accent);
+  }
+
+  .install-box {
+    background: linear-gradient(180deg, var(--surface), var(--bg-elevated));
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius-lg);
+    overflow: hidden;
+    max-width: 780px;
+  }
+
+  .tab-bar {
+    display: flex;
+    position: relative;
+    border-bottom: 1px solid var(--border);
+    background: rgba(255, 255, 255, 0.02);
+  }
+  .tab {
+    appearance: none;
+    background: none;
+    border: 0;
+    color: var(--text-muted);
+    font: 500 0.9rem var(--font-sans);
+    padding: 14px 22px;
+    cursor: pointer;
+    transition: color 0.2s ease;
+    position: relative;
+    z-index: 1;
+  }
+  .tab:hover {
+    color: var(--text);
+  }
+  .tab.active {
+    color: var(--accent);
+  }
+  .tab-indicator {
+    position: absolute;
+    bottom: -1px;
+    left: 0;
+    height: 2px;
+    background: var(--gradient);
+    transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1),
+      width 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  .tab-panel {
+    display: none;
+    padding: 22px 24px;
+  }
+  .tab-panel.active {
+    display: block;
+    animation: panel-in 0.35s ease;
+  }
+  @keyframes panel-in {
+    from {
+      opacity: 0;
+      transform: translateY(6px);
+    }
+    to {
+      opacity: 1;
+      transform: none;
+    }
+  }
+
+  .cmd-line {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 14px;
+    padding: 9px 0;
+  }
+  .cmd-line + .cmd-line {
+    border-top: 1px dashed var(--border);
+  }
+  .cmd-line code {
+    font-size: 0.85rem;
+    color: var(--text);
+    overflow-x: auto;
+    white-space: nowrap;
+    scrollbar-width: none;
+  }
+  .cmd-prompt {
+    color: var(--accent-2);
+    user-select: none;
+  }
+
+  .copy-btn {
+    flex-shrink: 0;
+    display: grid;
+    place-items: center;
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    background: rgba(255, 255, 255, 0.02);
+    color: var(--text-muted);
+    cursor: pointer;
+    transition: border-color 0.2s ease, color 0.2s ease;
+  }
+  .copy-btn:hover {
+    border-color: var(--accent);
+    color: var(--accent);
+  }
+  .copy-btn .ico-check {
+    display: none;
+    color: var(--accent);
+  }
+  .copy-btn.copied .ico-copy {
+    display: none;
+  }
+  .copy-btn.copied .ico-check {
+    display: block;
+  }
+
+  .install-note {
+    margin-top: 20px;
+    font-size: 0.9rem;
+    color: var(--text-faint);
+    max-width: 720px;
+  }
+  .install-note a {
+    color: var(--text-muted);
+    text-decoration: underline;
+    text-underline-offset: 3px;
+  }
+  .install-note a:hover {
+    color: var(--accent);
+  }
+</style>

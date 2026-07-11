@@ -1,0 +1,77 @@
+---
+const commands = [
+  { cmd: "dem install node@lts", desc: "Installs a version — lts, latest, 22, 22.5.1…" },
+  { cmd: "dem use go@1.22", desc: "Pins the version for the current project (dem.yaml)" },
+  { cmd: "dem use go@1.22 --global", desc: "Sets the global default" },
+  { cmd: "dem current", desc: "Shows the active versions here, and where they come from" },
+  { cmd: "dem list [tool] --remote", desc: "Lists installed (or available) versions" },
+  { cmd: "dem uninstall node@22", desc: "Removes an installed version" },
+  { cmd: "dem doctor", desc: "Health check: layout, PATH, stale shims, shadowed tools" },
+  { cmd: "dem self-update", desc: "Updates dem itself — never crosses a major silently" },
+];
+---
+
+<section id="commands">
+  <div class="container">
+    <p class="section-label reveal">Commands</p>
+    <h2 class="section-title reveal" style="--reveal-delay: 60ms">
+      A small surface you already know
+    </h2>
+    <p class="section-desc reveal" style="--reveal-delay: 120ms">
+      If you have used any version manager, you already know dem. Eight
+      commands cover the whole workflow.
+    </p>
+
+    <div class="cmd-grid">
+      {
+        commands.map((c, i) => (
+          <div class="cmd-item reveal" style={`--reveal-delay: ${(i % 4) * 70}ms`}>
+            <code>
+              <span class="p">$</span> {c.cmd}
+            </code>
+            <p>{c.desc}</p>
+          </div>
+        ))
+      }
+    </div>
+  </div>
+</section>
+
+<style>
+  .cmd-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 14px;
+  }
+  @media (max-width: 720px) {
+    .cmd-grid {
+      grid-template-columns: 1fr;
+    }
+  }
+  .cmd-item {
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 18px 20px;
+    background: rgba(255, 255, 255, 0.015);
+    transition: border-color 0.25s ease, background 0.25s ease,
+      transform 0.25s ease;
+  }
+  .cmd-item:hover {
+    border-color: var(--border-strong);
+    background: var(--surface);
+    transform: translateX(4px);
+  }
+  .cmd-item code {
+    display: block;
+    font-size: 0.9rem;
+    font-weight: 500;
+    margin-bottom: 6px;
+  }
+  .cmd-item .p {
+    color: var(--accent);
+  }
+  .cmd-item p {
+    font-size: 0.88rem;
+    color: var(--text-muted);
+  }
+</style>
