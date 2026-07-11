@@ -139,6 +139,9 @@ func (p *Provider) checksumFor(ctx context.Context, r ghRelease, asset string) (
 			return fields[0], nil
 		}
 	}
+	if err := sc.Err(); err != nil {
+		return "", fmt.Errorf("reading %s: %w", p.spec.Checksums, err)
+	}
 	return "", fmt.Errorf("%s has no entry for %s", p.spec.Checksums, asset)
 }
 

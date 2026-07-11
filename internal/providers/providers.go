@@ -16,6 +16,7 @@ import (
 	"github.com/ki-kneip/dem/internal/httpx"
 	"github.com/ki-kneip/dem/internal/providers/github"
 	"github.com/ki-kneip/dem/internal/providers/golang"
+	"github.com/ki-kneip/dem/internal/providers/java"
 	"github.com/ki-kneip/dem/internal/providers/node"
 	"github.com/ki-kneip/dem/internal/registry"
 )
@@ -52,7 +53,7 @@ func Names() []string {
 func load() {
 	loadOnce.Do(func() {
 		all = map[string]core.Provider{}
-		for _, p := range []core.Provider{golang.New(), node.New()} {
+		for _, p := range []core.Provider{golang.New(), node.New(), java.New()} {
 			all[p.Name()] = p
 		}
 		reg := loadRegistry()

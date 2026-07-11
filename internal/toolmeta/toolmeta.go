@@ -9,6 +9,12 @@ package toolmeta
 var Executables = map[string][]string{
 	"go":   {"go", "gofmt"},
 	"node": {"node", "npm", "npx", "corepack"},
+	"java": {
+		"java", "javac", "jar", "javadoc", "javap", "jcmd", "jconsole",
+		"jdb", "jdeps", "jfr", "jlink", "jmap", "jmod", "jpackage", "jps",
+		"jrunscript", "jshell", "jstack", "jstat", "keytool", "jarsigner",
+		"rmiregistry", "serialver",
+	},
 }
 
 // ToolFor finds the tool that owns an executable ("npm" -> "node").
@@ -24,8 +30,12 @@ func ToolFor(execName string) (string, bool) {
 }
 
 // EnvVars returns environment variables the tool requires pointing
-// at the installation directory (e.g. JAVA_HOME once the Java
-// provider lands). nil when there are none.
+// at the installation directory. nil when there are none.
 func EnvVars(tool, installDir string) map[string]string {
-	return nil
+	switch tool {
+	case "java":
+		return map[string]string{"JAVA_HOME": installDir}
+	default:
+		return nil
+	}
 }
