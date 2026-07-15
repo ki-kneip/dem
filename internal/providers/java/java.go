@@ -12,6 +12,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"runtime"
+	"sort"
 	"strings"
 
 	"github.com/ki-kneip/dem/internal/archive"
@@ -75,6 +76,13 @@ func splitVendorSpec(spec string) (vendor, versionSpec string) {
 	return defaultVendor, spec
 }
 
+// ListRemote returns one entry per vendor, its latest LTS build: the
+// overview a "dem list java --remote" user wants. Disco's own
+// "latest=available" does not guarantee one result per distro (it is
+// dominated by whichever vendor has the most GA builds, Zulu in
+// practice) and includes non-LTS releases, so both the LTS filter and
+// the per-distro grouping are applied here rather than trusted to the
+// API response.
 func (p *Provider) ListRemote(ctx context.Context) ([]core.Version, error) {
 	q := url.Values{
 		"operating_system": {discoOS()},
@@ -82,20 +90,37 @@ func (p *Provider) ListRemote(ctx context.Context) ([]core.Version, error) {
 		"archive_type":     {discoArchiveType()},
 		"package_type":     {"jdk"},
 		"release_status":   {"ga"},
-		"latest":           {"available"},
+		"latest":           {"per_distro"},
+		"term_of_support":  {"lts"},
+		"javafx_bundled":   {"false"},
 	}
 	pkgs, err := p.fetchPackages(ctx, q)
 	if err != nil {
 		return nil, err
 	}
+	return oneLTSPerVendor(pkgs), nil
+}
+
+// oneLTSPerVendor collapses packages into one core.Version per
+// distribution, sorted alphabetically by vendor. per_distro still
+// returns more than one build per vendor when a distro ships multiple
+// libc/packaging variants (e.g. glibc vs musl) for the same release,
+// so the first one seen per distribution is kept.
+func oneLTSPerVendor(pkgs []pkg) []core.Version {
+	seen := make(map[string]bool, len(pkgs))
 	versions := make([]core.Version, 0, len(pkgs))
 	for _, pk := range pkgs {
+		if seen[pk.Distribution] {
+			continue
+		}
+		seen[pk.Distribution] = true
 		versions = append(versions, core.Version{
 			Raw: pk.Distribution + "-" + pk.JavaVersion,
-			LTS: pk.TermOfSupport == "lts",
+			LTS: true,
 		})
 	}
-	return versions, nil
+	sort.Slice(versions, func(i, j int) bool { return versions[i].Raw < versions[j].Raw })
+	return versions
 }
 
 func (p *Provider) Resolve(ctx context.Context, spec string) (core.Version, error) {
