@@ -12,6 +12,8 @@ import (
 	"path/filepath"
 	"regexp"
 	"runtime"
+	"sort"
+	"strconv"
 	"strings"
 
 	"github.com/ki-kneip/dem/internal/archive"
@@ -38,6 +40,7 @@ func (*Provider) EnvVars(dir string) map[string]string { return toolmeta.EnvVars
 type pkg struct {
 	ID              string `json:"id"`
 	Distribution    string `json:"distribution"`
+	MajorVersion    int    `json:"major_version"`
 	JavaVersion     string `json:"java_version"`
 	TermOfSupport   string `json:"term_of_support"`
 	OperatingSystem string `json:"operating_system"`
@@ -75,6 +78,19 @@ func splitVendorSpec(spec string) (vendor, versionSpec string) {
 	return defaultVendor, spec
 }
 
+// ltsMajorsPerVendor is how many of a vendor's most recent LTS major
+// lines ListRemote surfaces (e.g. 25, 21, 17), so a user can pick
+// between the current and previous LTS lines instead of only ever
+// seeing the newest one.
+const ltsMajorsPerVendor = 3
+
+// ListRemote returns each vendor's most recent LTS major lines,
+// grouped by vendor: the overview a "dem list java --remote" user
+// wants. Disco's own "latest=available" does not guarantee one result
+// per distro (it is dominated by whichever vendor has the most GA
+// builds, Zulu in practice) and includes non-LTS releases, so both
+// the LTS filter and the per-vendor grouping are applied here rather
+// than trusted to the API response.
 func (p *Provider) ListRemote(ctx context.Context) ([]core.Version, error) {
 	q := url.Values{
 		"operating_system": {discoOS()},
@@ -83,19 +99,60 @@ func (p *Provider) ListRemote(ctx context.Context) ([]core.Version, error) {
 		"package_type":     {"jdk"},
 		"release_status":   {"ga"},
 		"latest":           {"available"},
+		"term_of_support":  {"lts"},
+		"javafx_bundled":   {"false"},
 	}
 	pkgs, err := p.fetchPackages(ctx, q)
 	if err != nil {
 		return nil, err
 	}
-	versions := make([]core.Version, 0, len(pkgs))
-	for _, pk := range pkgs {
-		versions = append(versions, core.Version{
-			Raw: pk.Distribution + "-" + pk.JavaVersion,
-			LTS: pk.TermOfSupport == "lts",
-		})
+	return groupLTSByVendor(pkgs, ltsMajorsPerVendor), nil
+}
+
+// groupLTSByVendor collapses packages into up to limit entries per
+// vendor — its most recent LTS major lines, newest first — grouped in
+// vendor-alphabetical order. Disco's "latest=available" scoped to
+// term_of_support=lts already returns roughly one build per (vendor,
+// major); it still doubles up when a distro ships multiple
+// libc/packaging variants of the same release (e.g. glibc vs musl on
+// Linux), so the first one seen per (vendor, major) is kept.
+func groupLTSByVendor(pkgs []pkg, limit int) []core.Version {
+	type build struct {
+		major   int
+		version string
 	}
-	return versions, nil
+	var vendors []string
+	byVendor := make(map[string][]build)
+	seen := make(map[string]bool, len(pkgs))
+	for _, pk := range pkgs {
+		key := pk.Distribution + "|" + strconv.Itoa(pk.MajorVersion)
+		if seen[key] {
+			continue
+		}
+		seen[key] = true
+		if _, ok := byVendor[pk.Distribution]; !ok {
+			vendors = append(vendors, pk.Distribution)
+		}
+		byVendor[pk.Distribution] = append(byVendor[pk.Distribution], build{pk.MajorVersion, pk.JavaVersion})
+	}
+	sort.Strings(vendors)
+
+	versions := make([]core.Version, 0, len(vendors)*limit)
+	for _, vendor := range vendors {
+		builds := byVendor[vendor]
+		sort.Slice(builds, func(i, j int) bool { return builds[i].major > builds[j].major })
+		if len(builds) > limit {
+			builds = builds[:limit]
+		}
+		for _, b := range builds {
+			versions = append(versions, core.Version{
+				Raw:   vendor + "-" + b.version,
+				LTS:   true,
+				Group: vendor,
+			})
+		}
+	}
+	return versions
 }
 
 func (p *Provider) Resolve(ctx context.Context, spec string) (core.Version, error) {

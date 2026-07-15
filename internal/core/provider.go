@@ -9,6 +9,13 @@ type Version struct {
 	// provider's semantics.
 	Raw string
 	LTS bool
+	// Group optionally names a cluster ListRemote's result belongs to
+	// (e.g. a JDK vendor: "corretto", "temurin"), for providers whose
+	// remote listing is naturally organized in more than one series.
+	// Empty for providers with a single series; the CLI prints
+	// grouped entries nested under their Group instead of as one flat
+	// list.
+	Group string
 }
 
 // Artifact is a completed, verified download ready to install.
