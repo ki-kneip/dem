@@ -2,6 +2,8 @@ package cli
 
 import (
 	"fmt"
+	"io"
+	"strings"
 
 	"github.com/spf13/cobra"
 
@@ -42,20 +44,8 @@ var listCmd = &cobra.Command{
 			if err != nil {
 				return err
 			}
-			if len(versions) > flagListLimit {
-				versions = versions[:flagListLimit]
-			}
 			fmt.Fprintln(out, ui.Title(prov.Name()+" — available versions"))
-			for _, v := range versions {
-				line := "  " + v.Raw
-				if v.LTS {
-					line += "  " + ui.Badge("LTS")
-				}
-				if paths.IsInstalled(prov.Name(), v.Raw) {
-					line += "  " + ui.Dim("(installed)")
-				}
-				fmt.Fprintln(out, line)
-			}
+			printRemoteVersions(out, paths, prov.Name(), versions, flagListLimit)
 			return nil
 		}
 
@@ -91,5 +81,61 @@ var listCmd = &cobra.Command{
 
 func init() {
 	listCmd.Flags().BoolVar(&flagListRemote, "remote", false, "list the versions available at the official source")
-	listCmd.Flags().IntVar(&flagListLimit, "limit", 15, "maximum number of remote versions shown")
+	listCmd.Flags().IntVar(&flagListLimit, "limit", 15, "maximum number of remote versions shown (or groups, for providers that group by vendor)")
+}
+
+// printRemoteVersions prints a "dem list <tool> --remote" result. When
+// entries carry a Group (e.g. java's JDK vendors), it prints one
+// section per group with the group's entries nested underneath and
+// the group prefix trimmed off; limit then caps the number of groups
+// shown, not the number of individual version lines, so every shown
+// group keeps its full set of entries. Ungrouped providers keep the
+// original flat listing, capped at limit lines.
+func printRemoteVersions(out io.Writer, paths core.Paths, tool string, versions []core.Version, limit int) {
+	grouped := false
+	for _, v := range versions {
+		if v.Group != "" {
+			grouped = true
+			break
+		}
+	}
+	if !grouped {
+		if len(versions) > limit {
+			versions = versions[:limit]
+		}
+		for _, v := range versions {
+			fmt.Fprintln(out, remoteVersionLine("  ", v.Raw, v, paths, tool))
+		}
+		return
+	}
+
+	var order []string
+	byGroup := make(map[string][]core.Version)
+	for _, v := range versions {
+		if _, ok := byGroup[v.Group]; !ok {
+			order = append(order, v.Group)
+		}
+		byGroup[v.Group] = append(byGroup[v.Group], v)
+	}
+	if len(order) > limit {
+		order = order[:limit]
+	}
+	for _, group := range order {
+		fmt.Fprintln(out, "  "+group)
+		for _, v := range byGroup[group] {
+			label := strings.TrimPrefix(v.Raw, group+"-")
+			fmt.Fprintln(out, remoteVersionLine("    ", label, v, paths, tool))
+		}
+	}
+}
+
+func remoteVersionLine(indent, label string, v core.Version, paths core.Paths, tool string) string {
+	line := indent + label
+	if v.LTS {
+		line += "  " + ui.Badge("LTS")
+	}
+	if paths.IsInstalled(tool, v.Raw) {
+		line += "  " + ui.Dim("(installed)")
+	}
+	return line
 }
