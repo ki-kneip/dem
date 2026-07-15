@@ -15,6 +15,7 @@ import (
 	"strings"
 	"time"
 
+	"golang.org/x/mod/semver"
 	"gopkg.in/yaml.v3"
 
 	dem "github.com/ki-kneip/dem"
@@ -23,7 +24,13 @@ import (
 // SupportedSchema is the registry schema this dem build understands.
 // A fetched registry with a different schema is ignored, so newer
 // registry formats never break older installations.
-const SupportedSchema = 1
+//
+// Bumped to 2 when versionedAssets was introduced: a dem build that
+// only understands schema 1 would otherwise parse a tool with no
+// top-level assets (because they moved into versionedAssets) and
+// reject the whole registry document as incomplete, taking every
+// other tool down with it.
+const SupportedSchema = 2
 
 // CacheFileName is the on-disk name of the fetched registry copy,
 // stored in the cache directory.
@@ -39,9 +46,23 @@ type Tool struct {
 	Repo        string            `yaml:"repo"`
 	Executables []string          `yaml:"executables"`
 	Assets      map[string]string `yaml:"assets"`
+	// VersionedAssets selects the asset map by the version being
+	// installed, for tools that changed their release asset naming
+	// (or dropped a target) partway through their history. Blocks are
+	// matched in document order; the first block whose since/before
+	// bounds contain the requested version wins. Mutually exclusive
+	// with Assets.
+	VersionedAssets []VersionedAssets `yaml:"versionedAssets"`
 	// Checksums is the optional name of a sha256sum-format asset used
 	// to verify downloads.
 	Checksums string `yaml:"checksums"`
+	// Aliases maps an executable name to another executable this tool
+	// already installs, for release archives that ship a single
+	// binary serving multiple command names (e.g. pnpm's binary also
+	// behaves as pnpx depending on how it is invoked, but its release
+	// archive only contains the "pnpm" file). The alias is realized by
+	// copying the target file once install extracts it.
+	Aliases map[string]string `yaml:"aliases,omitempty"`
 
 	// Type selects the provider: "" or "binary" (default, a GitHub
 	// Release asset) or "go-install" (built locally via
@@ -65,6 +86,15 @@ const (
 	TypeGoInstall = "go-install"
 )
 
+// VersionedAssets is one asset map that applies to a bounded range of
+// a tool's versions: [Since, Before), each bound optional and
+// inclusive/exclusive respectively.
+type VersionedAssets struct {
+	Since  string            `yaml:"since,omitempty"`
+	Before string            `yaml:"before,omitempty"`
+	Assets map[string]string `yaml:"assets"`
+}
+
 // Registry is the parsed registry file.
 type Registry struct {
 	Schema int             `yaml:"schema"`
@@ -83,8 +113,22 @@ func Parse(data []byte) (Registry, error) {
 	for name, t := range r.Tools {
 		switch t.Type {
 		case "", TypeBinary:
-			if t.Repo == "" || len(t.Executables) == 0 || len(t.Assets) == 0 {
+			if t.Repo == "" || len(t.Executables) == 0 || (len(t.Assets) == 0 && len(t.VersionedAssets) == 0) {
 				return r, fmt.Errorf("registry tool %q is missing repo, executables or assets", name)
+			}
+			if len(t.Assets) > 0 && len(t.VersionedAssets) > 0 {
+				return r, fmt.Errorf("registry tool %q has both assets and versionedAssets", name)
+			}
+			for _, block := range t.VersionedAssets {
+				if len(block.Assets) == 0 {
+					return r, fmt.Errorf("registry tool %q has a versionedAssets block with no assets", name)
+				}
+				if block.Since != "" && !semver.IsValid("v"+block.Since) {
+					return r, fmt.Errorf("registry tool %q has an invalid versionedAssets since %q", name, block.Since)
+				}
+				if block.Before != "" && !semver.IsValid("v"+block.Before) {
+					return r, fmt.Errorf("registry tool %q has an invalid versionedAssets before %q", name, block.Before)
+				}
 			}
 		case TypeGoInstall:
 			if t.Package == "" || len(t.Executables) == 0 {
@@ -156,10 +200,34 @@ func (r Registry) ToolFor(execName string) (string, bool) {
 // AssetFor resolves the asset name for the current platform and the
 // given version, expanding the {version} placeholder.
 func (t Tool) AssetFor(version string) (string, error) {
+	assets := t.Assets
+	if len(t.VersionedAssets) > 0 {
+		block, err := t.versionedAssetsFor(version)
+		if err != nil {
+			return "", err
+		}
+		assets = block
+	}
 	key := runtime.GOOS + "-" + runtime.GOARCH
-	tpl, ok := t.Assets[key]
+	tpl, ok := assets[key]
 	if !ok {
 		return "", fmt.Errorf("no asset declared for %s", key)
 	}
 	return strings.ReplaceAll(tpl, "{version}", version), nil
+}
+
+// versionedAssetsFor picks the asset map whose [since, before) range
+// contains version, in document order.
+func (t Tool) versionedAssetsFor(version string) (map[string]string, error) {
+	v := "v" + strings.TrimPrefix(version, "v")
+	for _, block := range t.VersionedAssets {
+		if block.Since != "" && semver.Compare(v, "v"+block.Since) < 0 {
+			continue
+		}
+		if block.Before != "" && semver.Compare(v, "v"+block.Before) >= 0 {
+			continue
+		}
+		return block.Assets, nil
+	}
+	return nil, fmt.Errorf("no asset scheme declared for version %s", version)
 }

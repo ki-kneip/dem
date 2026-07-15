@@ -13,6 +13,16 @@
 #                with the version (tag without the leading "v");
 #                .zip/.tar.gz assets are extracted, anything else is
 #                treated as the binary itself
+#   versionedAssets  alternative to assets, for tools that changed
+#                their asset naming partway through their history: a
+#                list of { since?, before?, assets } blocks, matched
+#                in order against the version being installed (bounds
+#                are semver, since inclusive / before exclusive)
+#   aliases      executable name -> another executable this tool
+#                already installs; realized by copying that file,
+#                for archives whose single binary serves more than
+#                one command name (e.g. pnpm's binary also behaves as
+#                pnpx, but only "pnpm" ships in the release archive)
 #   checksums    optional sha256sum-format asset to verify downloads
 #
 # type: go-install tools (no GitHub Release binaries; built locally
@@ -26,7 +36,7 @@
 # GOCACHE, removed as soon as the binary is extracted, so it never
 # leaves module or build cache bloat on the host.
 
-schema: 1
+schema: 2
 
 tools:
   kit:
@@ -42,13 +52,31 @@ tools:
   pnpm:
     repo: pnpm/pnpm
     executables: [pnpm, pnpx]
-    assets:
-      windows-amd64: pnpm-win-x64.exe
-      windows-arm64: pnpm-win-arm64.exe
-      linux-amd64: pnpm-linux-x64
-      linux-arm64: pnpm-linux-arm64
-      darwin-amd64: pnpm-macos-x64
-      darwin-arm64: pnpm-macos-arm64
+    aliases:
+      pnpx: pnpm
+    # pnpm renamed its release assets in v11: os names changed
+    # (win -> win32, macos -> darwin) and raw binaries became
+    # .tar.gz/.zip archives. v11.6.0-11.13.0 also dropped darwin-amd64
+    # (macOS Intel) entirely, so that key is intentionally absent from
+    # the >=11.0.0 block below; installing pnpm@11 on darwin-amd64
+    # fails with a clear "no asset declared" error instead of a wrong
+    # download.
+    versionedAssets:
+      - since: "11.0.0"
+        assets:
+          windows-amd64: pnpm-win32-x64.zip
+          windows-arm64: pnpm-win32-arm64.zip
+          linux-amd64: pnpm-linux-x64.tar.gz
+          linux-arm64: pnpm-linux-arm64.tar.gz
+          darwin-arm64: pnpm-darwin-arm64.tar.gz
+      - before: "11.0.0"
+        assets:
+          windows-amd64: pnpm-win-x64.exe
+          windows-arm64: pnpm-win-arm64.exe
+          linux-amd64: pnpm-linux-x64
+          linux-arm64: pnpm-linux-arm64
+          darwin-amd64: pnpm-macos-x64
+          darwin-arm64: pnpm-macos-arm64
 
   wails:
     type: go-install
