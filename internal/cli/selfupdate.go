@@ -15,6 +15,7 @@ import (
 var (
 	flagCheckOnly  bool
 	flagAllowMajor bool
+	flagPrerelease bool
 )
 
 var selfUpdateCmd = &cobra.Command{
@@ -23,12 +24,15 @@ var selfUpdateCmd = &cobra.Command{
 	Long: `Updates the DEM binary from the official releases.
 
 By default it only updates within the same major version (no
-breaking change). To accept a new major, run with --allow-major.`,
+breaking change), and only ever considers a stable release. Pass
+--pre to deliberately try the newest prerelease (e.g. a v0.3.0-beta.1)
+instead — plain 'dem self-update' runs afterward still ignore it and
+only offer the next stable release.`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		out := cmd.OutOrStdout()
 		fmt.Fprintln(out, ui.Dim("checking releases..."))
 
-		rel, err := update.Latest(cmd.Context())
+		rel, err := update.Latest(cmd.Context(), flagPrerelease)
 		if err != nil {
 			return err
 		}
@@ -73,4 +77,5 @@ breaking change). To accept a new major, run with --allow-major.`,
 func init() {
 	selfUpdateCmd.Flags().BoolVar(&flagCheckOnly, "check", false, "only check whether an update exists, without applying it")
 	selfUpdateCmd.Flags().BoolVar(&flagAllowMajor, "allow-major", false, "allow updating across a major version (breaking change)")
+	selfUpdateCmd.Flags().BoolVar(&flagPrerelease, "pre", false, "consider the newest prerelease too, not just stable releases")
 }

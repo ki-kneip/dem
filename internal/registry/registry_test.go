@@ -32,6 +32,40 @@ func TestParseRejectsIncompleteTool(t *testing.T) {
 	}
 }
 
+func TestParseAcceptsGoInstallTool(t *testing.T) {
+	doc := "schema: 1\ntools:\n  wails:\n    type: go-install\n" +
+		"    repo: wailsapp/wails\n    package: github.com/wailsapp/wails/v2/cmd/wails\n" +
+		"    executables: [wails]\n    requires: [\"go>=1.21\"]\n"
+	r, err := Parse([]byte(doc))
+	if err != nil {
+		t.Fatal(err)
+	}
+	tool := r.Tools["wails"]
+	if tool.Type != TypeGoInstall {
+		t.Fatalf("got type %q, want %q", tool.Type, TypeGoInstall)
+	}
+	if tool.Package != "github.com/wailsapp/wails/v2/cmd/wails" {
+		t.Fatalf("unexpected package %q", tool.Package)
+	}
+	if len(tool.Requires) != 1 || tool.Requires[0] != "go>=1.21" {
+		t.Fatalf("unexpected requires %v", tool.Requires)
+	}
+}
+
+func TestParseRejectsIncompleteGoInstallTool(t *testing.T) {
+	doc := "schema: 1\ntools:\n  broken:\n    type: go-install\n    repo: a/b\n"
+	if _, err := Parse([]byte(doc)); err == nil {
+		t.Fatal("expected an error for a go-install tool without package/executables")
+	}
+}
+
+func TestParseRejectsUnknownType(t *testing.T) {
+	doc := "schema: 1\ntools:\n  broken:\n    type: npm-install\n    repo: a/b\n    executables: [x]\n"
+	if _, err := Parse([]byte(doc)); err == nil {
+		t.Fatal("expected an error for an unknown tool type")
+	}
+}
+
 func TestAssetForExpandsVersion(t *testing.T) {
 	key := runtime.GOOS + "-" + runtime.GOARCH
 	tool := Tool{Assets: map[string]string{key: "x_v{version}_" + key + ".zip"}}

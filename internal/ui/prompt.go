@@ -31,3 +31,16 @@ func Ask(in io.Reader, out io.Writer, question, def string) (string, error) {
 	}
 	return line, nil
 }
+
+// Confirm asks a yes/no question; only an explicit "y" or "yes"
+// (case-insensitive) answers true, so a stray Enter on a destructive
+// prompt defaults to declining rather than proceeding.
+func Confirm(in io.Reader, out io.Writer, question string) (bool, error) {
+	fmt.Fprintf(out, "%s %s ", question, Dim("[y/N]"))
+	line, err := bufio.NewReader(in).ReadString('\n')
+	if err != nil && err != io.EOF {
+		return false, err
+	}
+	line = strings.ToLower(strings.TrimSpace(line))
+	return line == "y" || line == "yes", nil
+}

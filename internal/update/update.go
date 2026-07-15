@@ -36,35 +36,35 @@ type Release struct {
 	Assets  map[string]string
 }
 
-// Latest queries GitHub for the most recent release.
-func Latest(ctx context.Context) (*Release, error) {
-	url := fmt.Sprintf("https://api.github.com/repos/%s/%s/releases/latest", repoOwner, repoName)
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
-	if err != nil {
-		return nil, err
-	}
-	req.Header.Set("Accept", "application/vnd.github+json")
-	resp, err := httpClient.Do(req)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-	if resp.StatusCode == http.StatusNotFound {
-		return nil, fmt.Errorf("no release published at %s/%s yet", repoOwner, repoName)
-	}
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("GitHub answered %s", resp.Status)
-	}
+type releasePayload struct {
+	TagName string `json:"tag_name"`
+	Assets  []struct {
+		Name string `json:"name"`
+		URL  string `json:"browser_download_url"`
+	} `json:"assets"`
+}
 
-	var payload struct {
-		TagName string `json:"tag_name"`
-		Assets  []struct {
-			Name string `json:"name"`
-			URL  string `json:"browser_download_url"`
-		} `json:"assets"`
-	}
-	if err := json.NewDecoder(resp.Body).Decode(&payload); err != nil {
-		return nil, err
+// Latest queries GitHub for the most recent release. GitHub's
+// releases/latest endpoint (the default) never returns a prerelease,
+// so self-update never picks one up on its own; pass
+// includePrerelease to opt into testing one deliberately.
+func Latest(ctx context.Context, includePrerelease bool) (*Release, error) {
+	var payload releasePayload
+	if includePrerelease {
+		url := fmt.Sprintf("https://api.github.com/repos/%s/%s/releases?per_page=1", repoOwner, repoName)
+		var list []releasePayload
+		if err := fetchJSON(ctx, url, &list); err != nil {
+			return nil, err
+		}
+		if len(list) == 0 {
+			return nil, fmt.Errorf("no release published at %s/%s yet", repoOwner, repoName)
+		}
+		payload = list[0]
+	} else {
+		url := fmt.Sprintf("https://api.github.com/repos/%s/%s/releases/latest", repoOwner, repoName)
+		if err := fetchJSON(ctx, url, &payload); err != nil {
+			return nil, err
+		}
 	}
 
 	rel := &Release{Version: normalize(payload.TagName), Assets: map[string]string{}}
@@ -75,6 +75,26 @@ func Latest(ctx context.Context) (*Release, error) {
 		return nil, fmt.Errorf("release tag is not valid semver: %q", payload.TagName)
 	}
 	return rel, nil
+}
+
+func fetchJSON(ctx context.Context, url string, v any) error {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	if err != nil {
+		return err
+	}
+	req.Header.Set("Accept", "application/vnd.github+json")
+	resp, err := httpClient.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode == http.StatusNotFound {
+		return fmt.Errorf("no release published at %s/%s yet", repoOwner, repoName)
+	}
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("GitHub answered %s", resp.Status)
+	}
+	return json.NewDecoder(resp.Body).Decode(v)
 }
 
 // AssetName is the expected binary name for this platform, following

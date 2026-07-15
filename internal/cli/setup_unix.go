@@ -46,6 +46,31 @@ func persistPath(paths core.Paths) (bool, error) {
 	return true, nil
 }
 
+// unpersistPath removes the exact block persistPath appended for
+// paths, when the active shell's rc file is recognized and still
+// contains it verbatim. A missing rc file, an unrecognized shell, or
+// a block that no longer matches (hand-edited, already removed) is
+// not an error — relocate falls back to printing manual instructions.
+func unpersistPath(paths core.Paths) error {
+	rcPath, line, ok := rcFileFor(paths)
+	if !ok {
+		return nil
+	}
+	data, err := os.ReadFile(rcPath)
+	if os.IsNotExist(err) {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	block := "\n# added by 'dem setup'\n" + line + "\n"
+	if !strings.Contains(string(data), block) {
+		return nil
+	}
+	updated := strings.Replace(string(data), block, "", 1)
+	return os.WriteFile(rcPath, []byte(updated), 0o644)
+}
+
 // rcFileFor maps the shell in $SHELL to its rc file and the line to
 // append to it.
 func rcFileFor(paths core.Paths) (rcPath, line string, ok bool) {

@@ -32,7 +32,9 @@ const CacheFileName = "registry.yaml"
 // CacheTTL is how long a fetched copy is considered fresh.
 const CacheTTL = 24 * time.Hour
 
-// Tool describes one GitHub-release tool.
+// Tool describes one registry-managed tool: either a GitHub-release
+// binary (the default) or a go-install tool, compiled locally with
+// the Go toolchain.
 type Tool struct {
 	Repo        string            `yaml:"repo"`
 	Executables []string          `yaml:"executables"`
@@ -40,7 +42,28 @@ type Tool struct {
 	// Checksums is the optional name of a sha256sum-format asset used
 	// to verify downloads.
 	Checksums string `yaml:"checksums"`
+
+	// Type selects the provider: "" or "binary" (default, a GitHub
+	// Release asset) or "go-install" (built locally via
+	// `go install <package>@<version>`).
+	Type string `yaml:"type,omitempty"`
+	// Package is the Go module path installed for type: go-install
+	// (e.g. github.com/wailsapp/wails/v2/cmd/wails).
+	Package string `yaml:"package,omitempty"`
+	// Requires lists dependencies the provider checks before
+	// building, e.g. "go>=1.21".
+	Requires []string `yaml:"requires,omitempty"`
+	// PostInstall are commands run (each split on whitespace, no
+	// shell) after a successful build, e.g. to trim caches the build
+	// leaves behind.
+	PostInstall []string `yaml:"postInstall,omitempty"`
 }
+
+// TypeBinary and TypeGoInstall are the recognized values of Type.
+const (
+	TypeBinary    = "binary"
+	TypeGoInstall = "go-install"
+)
 
 // Registry is the parsed registry file.
 type Registry struct {
@@ -58,8 +81,17 @@ func Parse(data []byte) (Registry, error) {
 		return r, fmt.Errorf("registry schema %d is not supported by this dem build (supports %d)", r.Schema, SupportedSchema)
 	}
 	for name, t := range r.Tools {
-		if t.Repo == "" || len(t.Executables) == 0 || len(t.Assets) == 0 {
-			return r, fmt.Errorf("registry tool %q is missing repo, executables or assets", name)
+		switch t.Type {
+		case "", TypeBinary:
+			if t.Repo == "" || len(t.Executables) == 0 || len(t.Assets) == 0 {
+				return r, fmt.Errorf("registry tool %q is missing repo, executables or assets", name)
+			}
+		case TypeGoInstall:
+			if t.Package == "" || len(t.Executables) == 0 {
+				return r, fmt.Errorf("registry tool %q is missing package or executables", name)
+			}
+		default:
+			return r, fmt.Errorf("registry tool %q has unknown type %q", name, t.Type)
 		}
 	}
 	return r, nil

@@ -15,6 +15,7 @@ import (
 	"github.com/ki-kneip/dem/internal/core"
 	"github.com/ki-kneip/dem/internal/httpx"
 	"github.com/ki-kneip/dem/internal/providers/github"
+	"github.com/ki-kneip/dem/internal/providers/goinstall"
 	"github.com/ki-kneip/dem/internal/providers/golang"
 	"github.com/ki-kneip/dem/internal/providers/java"
 	"github.com/ki-kneip/dem/internal/providers/node"
@@ -61,7 +62,12 @@ func load() {
 			if _, exists := all[name]; exists {
 				continue // built-in providers win over registry entries
 			}
-			all[name] = github.New(name, spec)
+			switch spec.Type {
+			case registry.TypeGoInstall:
+				all[name] = goinstall.New(name, spec)
+			default:
+				all[name] = github.New(name, spec)
+			}
 		}
 	})
 }

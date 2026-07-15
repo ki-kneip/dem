@@ -51,12 +51,23 @@ func (p Paths) EnsureShims(payload []byte, names []string) error {
 // (after a self-update, hardlinks keep pointing at the old content
 // until recreated).
 func (p Paths) RefreshShims(payload []byte) error {
-	entries, err := os.ReadDir(p.Shims)
-	if os.IsNotExist(err) {
-		return nil
-	}
+	names, err := p.ShimNames()
 	if err != nil {
 		return err
+	}
+	return p.EnsureShims(payload, names)
+}
+
+// ShimNames lists the tool names currently linked in shims/ (not
+// dem-shim itself or leftover .old files) — what a name in shims/
+// resolves back to, independent of the registry or providers.
+func (p Paths) ShimNames() ([]string, error) {
+	entries, err := os.ReadDir(p.Shims)
+	if os.IsNotExist(err) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
 	}
 	var names []string
 	for _, e := range entries {
@@ -66,7 +77,7 @@ func (p Paths) RefreshShims(payload []byte) error {
 		}
 		names = append(names, strings.TrimSuffix(name, ".exe"))
 	}
-	return p.EnsureShims(payload, names)
+	return names, nil
 }
 
 // writeIfChanged writes content to path only when the content
