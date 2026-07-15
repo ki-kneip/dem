@@ -142,8 +142,9 @@ stdio, arguments and exit code. Installing a version never touches another;
 switching versions moves no files.
 
 Downloads are checksum-verified against each source's official manifest and
-cached. `self-update` replaces the binary atomically and refuses to cross a
-major version unless you pass `--allow-major`.
+cached. `self-update` replaces the binary atomically, refuses to cross a
+major version unless you pass `--allow-major`, and only ever considers a
+stable release unless you pass `--pre` to try the newest prerelease instead.
 
 ## Building from source
 
