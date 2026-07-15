@@ -29,6 +29,6 @@ var rootCmd = &cobra.Command{
 func Execute() error {
 	rootCmd.PersistentFlags().BoolVar(&flagPlain, "plain", false,
 		"plain text output, no colors or interactivity (for scripts/CI)")
-	rootCmd.AddCommand(setupCmd, selfUpdateCmd, installCmd, uninstallCmd, useCmd, listCmd, currentCmd, doctorCmd, shimsCmd)
+	rootCmd.AddCommand(setupCmd, selfUpdateCmd, installCmd, uninstallCmd, useCmd, listCmd, currentCmd, doctorCmd, shimsCmd, relocateCmd, cacheCmd)
 	return rootCmd.Execute()
 }

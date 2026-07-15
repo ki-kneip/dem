@@ -61,6 +61,49 @@ func persistPath(paths core.Paths) (bool, error) {
 	return true, nil
 }
 
+// unpersistPath removes paths.Bin and paths.Shims from the current
+// user's persistent PATH (HKCU\Environment), mirroring persistPath.
+func unpersistPath(paths core.Paths) error {
+	k, err := registry.OpenKey(registry.CURRENT_USER, `Environment`, registry.QUERY_VALUE|registry.SET_VALUE)
+	if err != nil {
+		return err
+	}
+	defer k.Close()
+
+	current, _, err := k.GetStringValue("Path")
+	if err != nil {
+		if err == registry.ErrNotExist {
+			return nil
+		}
+		return err
+	}
+
+	remove := map[string]bool{
+		strings.ToLower(paths.Bin):   true,
+		strings.ToLower(paths.Shims): true,
+	}
+	var kept []string
+	changed := false
+	for _, p := range strings.Split(current, ";") {
+		if p == "" {
+			continue
+		}
+		if remove[strings.ToLower(p)] {
+			changed = true
+			continue
+		}
+		kept = append(kept, p)
+	}
+	if !changed {
+		return nil
+	}
+	if err := k.SetStringValue("Path", strings.Join(kept, ";")); err != nil {
+		return err
+	}
+	broadcastEnvChange()
+	return nil
+}
+
 // broadcastEnvChange tells running processes (Explorer, mainly) that
 // the environment changed, the same signal setx and MSI installers
 // send, so new processes they spawn see the updated PATH.

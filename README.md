@@ -66,6 +66,8 @@ verifies everything at any time.
 | `dem doctor` | Health check: layout, PATH, stale shims, shadowed tools |
 | `dem self-update` | Updates dem itself (never crosses a major silently) |
 | `dem shims refresh` | Re-extracts and relinks the shims |
+| `dem relocate <dir>` | Moves the installation to `<dir>`, updates PATH, removes the old one |
+| `dem cache clean` | Deletes cached downloads (frees disk, forces a re-download next install) |
 
 Every command supports `--plain` for scripts and CI: no colors, no prompts,
 no progress bars.
