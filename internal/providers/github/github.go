@@ -95,10 +95,14 @@ func (p *Provider) Download(ctx context.Context, v core.Version, cacheDir string
 }
 
 // Install extracts archive assets into dir, or installs a raw binary
-// asset under each executable name in dir/bin.
+// asset under each executable name in dir/bin, then realizes any
+// declared aliases.
 func (p *Provider) Install(a core.Artifact, dir string) error {
 	if strings.HasSuffix(a.Path, ".zip") || strings.HasSuffix(a.Path, ".tar.gz") || strings.HasSuffix(a.Path, ".tgz") {
-		return archive.Extract(a.Path, dir, 0)
+		if err := archive.Extract(a.Path, dir, 0); err != nil {
+			return err
+		}
+		return p.realizeAliases(dir)
 	}
 	binDir := filepath.Join(dir, "bin")
 	if err := os.MkdirAll(binDir, 0o755); err != nil {
@@ -110,6 +114,23 @@ func (p *Provider) Install(a core.Artifact, dir string) error {
 	}
 	for _, name := range p.spec.Executables {
 		if err := copyExecutable(a.Path, filepath.Join(binDir, name+ext)); err != nil {
+			return err
+		}
+	}
+	return p.realizeAliases(dir)
+}
+
+// realizeAliases copies each declared alias target's installed file
+// under the alias name, alongside it. A no-op when the tool declares
+// no aliases (the common case).
+func (p *Provider) realizeAliases(dir string) error {
+	for alias, target := range p.spec.Aliases {
+		src, ok := core.FindExecutable(dir, target)
+		if !ok {
+			return fmt.Errorf("%s: alias %s points at %s, which was not installed", p.name, alias, target)
+		}
+		dst := filepath.Join(filepath.Dir(src), alias+filepath.Ext(src))
+		if err := copyExecutable(src, dst); err != nil {
 			return err
 		}
 	}
