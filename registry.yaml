@@ -14,6 +14,17 @@
 #                .zip/.tar.gz assets are extracted, anything else is
 #                treated as the binary itself
 #   checksums    optional sha256sum-format asset to verify downloads
+#
+# type: go-install tools (no GitHub Release binaries; built locally
+# with the Go toolchain) use a different set of fields instead of
+# assets/checksums:
+#   package      Go module path passed to `go install <package>@<version>`
+#   requires     dependencies checked before building, e.g. "go>=1.21"
+#   postInstall  best-effort commands run after a successful build
+#                (each split on whitespace, no shell)
+# Every go-install build runs with its own throwaway GOBIN/GOMODCACHE/
+# GOCACHE, removed as soon as the binary is extracted, so it never
+# leaves module or build cache bloat on the host.
 
 schema: 1
 
@@ -38,3 +49,10 @@ tools:
       linux-arm64: pnpm-linux-arm64
       darwin-amd64: pnpm-macos-x64
       darwin-arm64: pnpm-macos-arm64
+
+  wails:
+    type: go-install
+    repo: wailsapp/wails
+    package: github.com/wailsapp/wails/v2/cmd/wails
+    executables: [wails]
+    requires: ["go>=1.21"]

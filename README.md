@@ -102,12 +102,22 @@ Releases, described declaratively in [registry.yaml](registry.yaml):
 |---|---|
 | `pnpm` | pnpm/pnpm (standalone, independent of the Node version) |
 | `kit` | ki-kneip/kit |
+| `wails` | wailsapp/wails (built locally with `go install`; requires `go` — see below) |
 
 A registry snapshot is embedded in the binary; dem refreshes it from
 this repository at most once a day, caches the copy, and only adopts
 an update when its schema is supported by the running build — newer
 registry formats never break older installations. Adding a tool to
 the registry is a small YAML pull request, no Go required.
+
+Some registry tools are not distributed as GitHub Release binaries and
+are instead built locally with `go install` (`wails`, for example).
+These declare `type: go-install` in the registry, along with the
+dependencies they need (e.g. `go>=1.21`, checked before building) —
+`dem` fails fast with an actionable message if they are missing. Each
+build runs in its own throwaway module and build cache, removed as
+soon as the compiled binary is extracted, so a tool you install once
+never leaves its dependency graph behind on disk.
 
 Planned: Python, Gradle, Maven.
 
