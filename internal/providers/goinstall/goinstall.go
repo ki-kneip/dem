@@ -119,23 +119,77 @@ func (p *Provider) Resolve(ctx context.Context, spec string) (core.Version, erro
 var requireRe = regexp.MustCompile(`^([a-zA-Z0-9_-]+)>=(.+)$`)
 
 // checkRequires validates the declared dependencies are met before
-// spending time on a build. Only "<tool>>=<version>" is supported
-// today, and only "go" is a recognized dependency.
-func (p *Provider) checkRequires(ctx context.Context) error {
+// spending time on a build, and returns the go binary the build
+// should use. Only "<tool>>=<version>" is supported today, and only
+// "go" is a recognized dependency.
+//
+// It prefers a go dem itself manages (the active "dem install go"
+// version) over whatever "go" resolves to on PATH, so the build the
+// user gets matches what "dem install go" would give them elsewhere.
+// A PATH go that satisfies the requirement is still accepted (with a
+// warning) rather than forcing a redundant "dem install go" when the
+// user already has a suitable toolchain; no go anywhere satisfying
+// the requirement is a hard failure — the tool is not installed.
+func (p *Provider) checkRequires(ctx context.Context) (goBin string, err error) {
 	for _, req := range p.spec.Requires {
 		m := requireRe.FindStringSubmatch(req)
 		if m == nil {
-			return fmt.Errorf("%s: malformed requirement %q (expected \"tool>=version\")", p.name, req)
+			return "", fmt.Errorf("%s: malformed requirement %q (expected \"tool>=version\")", p.name, req)
 		}
 		tool, want := m[1], m[2]
 		if tool != "go" {
-			return fmt.Errorf("%s: unsupported requirement %q (only \"go\" is currently supported)", p.name, req)
+			return "", fmt.Errorf("%s: unsupported requirement %q (only \"go\" is currently supported)", p.name, req)
 		}
-		if err := checkGoVersion(ctx, want); err != nil {
-			return fmt.Errorf("%s requires go>=%s: %w", p.name, want, err)
+		bin, demManaged, err := resolveGo(ctx, want)
+		if err != nil {
+			return "", fmt.Errorf("%s requires go>=%s: %w", p.name, want, err)
+		}
+		if !demManaged {
+			fmt.Fprintf(os.Stderr, "warning: %s is building with go at %s, which dem does not manage; consider 'dem install go@%s' for a reproducible build\n", p.name, bin, want)
+		}
+		goBin = bin
+	}
+	return goBin, nil
+}
+
+// resolveGo finds a go binary satisfying "go>=want", preferring the
+// one dem itself has installed and made active over whatever "go"
+// resolves to on the system PATH. Returns an error only when neither
+// source has a go new enough (or a go at all).
+func resolveGo(ctx context.Context, want string) (bin string, demManaged bool, err error) {
+	if demBin, ok := demGo(); ok {
+		if err := checkGoVersionAt(ctx, demBin, want); err == nil {
+			return demBin, true, nil
 		}
 	}
-	return nil
+	if pathBin, lookErr := exec.LookPath("go"); lookErr == nil {
+		if err := checkGoVersionAt(ctx, pathBin, want); err == nil {
+			return pathBin, false, nil
+		}
+	}
+	return "", false, fmt.Errorf("no go>=%s found (checked dem's own go install and PATH); install it with 'dem install go@%s'", want, want)
+}
+
+// demGo returns the go binary for dem's own active "go" version, if
+// one is configured and actually installed.
+func demGo() (bin string, ok bool) {
+	paths, err := core.ResolvePaths()
+	if err != nil {
+		return "", false
+	}
+	cfg, err := core.LoadConfig(paths.ConfigFile())
+	if err != nil {
+		return "", false
+	}
+	cwd, err := os.Getwd()
+	if err != nil {
+		return "", false
+	}
+	version, _, err := core.ResolveActive("go", cwd, cfg)
+	if err != nil || !paths.IsInstalled("go", version) {
+		return "", false
+	}
+	return core.FindExecutable(paths.InstallDir("go", version), "go")
 }
 
 // goVersionRe pulls the leading X.Y[.Z] out of a "go version" token,
@@ -143,10 +197,10 @@ func (p *Provider) checkRequires(ctx context.Context) error {
 // builds reporting "go1.26.5-someflag" instead of a plain "go1.26.5").
 var goVersionRe = regexp.MustCompile(`^(\d+\.\d+(?:\.\d+)?)`)
 
-func checkGoVersion(ctx context.Context, want string) error {
-	out, err := exec.CommandContext(ctx, "go", "version").Output()
+func checkGoVersionAt(ctx context.Context, goBin, want string) error {
+	out, err := exec.CommandContext(ctx, goBin, "version").Output()
 	if err != nil {
-		return fmt.Errorf("go is not on PATH; install it with 'dem install go@%s'", want)
+		return fmt.Errorf("running %s version: %w", goBin, err)
 	}
 	var got string
 	for _, f := range strings.Fields(string(out)) {
@@ -162,7 +216,7 @@ func checkGoVersion(ctx context.Context, want string) error {
 		return fmt.Errorf("could not parse 'go version' output: %q", strings.TrimSpace(string(out)))
 	}
 	if semver.Compare("v"+got, "v"+want) < 0 {
-		return fmt.Errorf("found go %s, need >= %s; install it with 'dem install go@%s'", got, want, want)
+		return fmt.Errorf("found go %s, need >= %s", got, want)
 	}
 	return nil
 }
@@ -173,8 +227,12 @@ func checkGoVersion(ctx context.Context, want string) error {
 // the binary is copied out, so no module or build cache is left
 // behind on the host.
 func (p *Provider) Download(ctx context.Context, v core.Version, cacheDir string) (core.Artifact, error) {
-	if err := p.checkRequires(ctx); err != nil {
+	goBin, err := p.checkRequires(ctx)
+	if err != nil {
 		return core.Artifact{}, err
+	}
+	if goBin == "" {
+		goBin = "go" // no "go>=..." requirement declared; fall back to PATH
 	}
 
 	buildDir, err := os.MkdirTemp(cacheDir, "goinstall-"+p.name+"-*")
@@ -186,7 +244,7 @@ func (p *Provider) Download(ctx context.Context, v core.Version, cacheDir string
 	gobin := filepath.Join(buildDir, "bin")
 	target := p.spec.Package + "@v" + v.Raw
 
-	cmd := exec.CommandContext(ctx, "go", "install", target)
+	cmd := exec.CommandContext(ctx, goBin, "install", target)
 	cmd.Env = append(os.Environ(),
 		"GOBIN="+gobin,
 		"GOMODCACHE="+filepath.Join(buildDir, "mod"),
